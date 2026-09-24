@@ -6,4 +6,4 @@
 # panel, no per-call approvals.
 - insert:
     - id: dsh-cdp
-      name: 'dsh-cdp'
+      name: '@dougen/dsh-cdp'

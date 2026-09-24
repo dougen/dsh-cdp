@@ -1,4 +1,4 @@
-# dsh-cdp
+# @dougen/dsh-cdp
 
 **English** · [中文](#中文)
 
@@ -23,7 +23,7 @@ It targets the three usual pains of driving a browser over CDP:
 ### Install
 
 ```sh
-dsh plugin --profile web add dsh-cdp
+dsh plugin --profile web add @dougen/dsh-cdp
 ```
 
 Restart the Web GUI (`dsh web`) afterwards.
@@ -49,7 +49,7 @@ That is a brand-new profile directory: none of your current cookies, logins, or 
 ### Remove
 
 ```sh
-dsh plugin --profile web remove dsh-cdp
+dsh plugin --profile web remove @dougen/dsh-cdp
 ```
 
 Restart the Web GUI afterwards.
@@ -99,7 +99,7 @@ MIT
 
 ## 中文
 
-[English ↑](#dsh-cdp)
+[English ↑](#dougen-dsh-cdp)
 
 让 DSH 直接驱动你**已经在用的** Chromium 内核浏览器——保留你的登录态、cookie 和扩展。
 
@@ -122,7 +122,7 @@ DSH 可以读取并操作你浏览器里真实打开的页面：导航、执行 
 ### 安装
 
 ```sh
-dsh plugin --profile web add dsh-cdp
+dsh plugin --profile web add @dougen/dsh-cdp
 ```
 
 装完重启 Web GUI（`dsh web`）后生效。
@@ -148,7 +148,7 @@ msedge.exe --remote-debugging-port=9222 --user-data-dir="C:\edge-debug"
 ### 卸载
 
 ```sh
-dsh plugin --profile web remove dsh-cdp
+dsh plugin --profile web remove @dougen/dsh-cdp
 ```
 
 重启 Web GUI 后生效。

@@ -1,5 +1,5 @@
 {
-  "name": "dsh-cdp",
+  "name": "@dougen/dsh-cdp",
   "version": "0.2.0",
   "description": "让 DSH 通过 CDP 驱动本机已开启调试的 Chromium 内核浏览器：常驻连接只授权一次，零新增工具 schema，零运行时依赖。Drive any already-running Chromium browser over CDP from DSH — one approval per connection, no extra tool schemas, no dependencies.",
   "type": "module",
@@ -35,5 +35,13 @@
     "edge",
     "devtools"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dougen/dsh-cdp.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  }
 }
