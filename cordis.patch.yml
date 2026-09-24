@@ -1,0 +1,9 @@
+# dsh-cdp bundle layer: mount the plugin on the host plane.
+#
+# The plugin holds one long-lived CDP connection to an already-running
+# Chromium browser, exposes commands on a loopback HTTP route for the agent,
+# and registers its own usage skill — no client injection beyond the status
+# panel, no per-call approvals.
+- insert:
+    - id: dsh-cdp
+      name: 'dsh-cdp'
