@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # OIDC: lets npm verify this workflow identity, so no publish token exists to rotate or leak
 
 jobs:
   publish:
@@ -17,11 +18,23 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          # Node 24 ships npm 11.x. Trusted publishing needs npm >= 11.5.1, and the
+          # Node 22.14 floor still ships npm 10.9, so the Node version is what
+          # actually clears the npm requirement here.
+          #
+          # Deliberately no `registry-url`: that option writes an .npmrc carrying an
+          # empty _authToken placeholder, and npm then prefers it over the OIDC
+          # exchange. npm's default registry is already registry.npmjs.org.
+          node-version: 24
 
-      # setup-node writes an .npmrc carrying //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN,
-      # so this plain publish authenticates against npmjs without an extra --registry flag.
+      - name: Print the OIDC publish context
+        run: |
+          echo "repository:   ${GITHUB_REPOSITORY}"
+          echo "workflow:     ${GITHUB_WORKFLOW}"
+          echo "ref:          ${GITHUB_REF}"
+          echo "node:         $(node --version)"
+          echo "npm:          $(npm --version)"
+
+      # Provenance is attached automatically in trusted-publishing mode: the
+      # attestation binds this tarball to this workflow run and commit.
       - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
