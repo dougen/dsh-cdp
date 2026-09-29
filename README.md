@@ -6,6 +6,8 @@ Drive the Chromium browser you are **already using** from DSH — your logins, c
 
 Works with Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Arc, and Thorium.
 
+**Compatible with DSH 0.1.0 and later** — every `0.1.x` and `0.2.x` release, prereleases included.
+
 ## 1. What it does
 
 DSH can read and operate the pages genuinely open in your browser: navigate, evaluate JS, read the DOM, click, type, screenshot, and run DOM / pixel assertions. So "what is on this page", "log in and pull the data down", "is this page rendering correctly" all run against your real session — no second, clean browser.
@@ -104,6 +106,8 @@ MIT
 让 DSH 直接驱动你**已经在用的** Chromium 内核浏览器——保留你的登录态、cookie 和扩展。
 
 支持 Chrome、Edge、Brave、Vivaldi、Opera、Chromium、Arc、Thorium。
+
+**兼容 DSH 0.1.0 及以上版本**——`0.1.x` 与 `0.2.x` 全系列，含预发布版。
 
 ## 一、它做什么
 
