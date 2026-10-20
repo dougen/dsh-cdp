@@ -1,0 +1,18 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Theme: attach to the Chromium already running on this machine, then drive
+       the page it has open. The artwork is a frameless browser window with a
+       pointer inside the page area — the same window shape this plugin paints in
+       the composer. One diagonal gradient, no background, like the shipped
+       bundle icons. -->
+  <defs>
+    <linearGradient id="cdp" x1="5" y1="5" x2="31" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7CC0FF"/>
+      <stop offset="1" stop-color="#3A5BFF"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="6" width="28" height="24" rx="5" stroke="url(#cdp)" stroke-width="2.2"/>
+  <path d="M4 12.5H32" stroke="url(#cdp)" stroke-width="2.2"/>
+  <circle cx="7.9" cy="9.3" r="1" fill="url(#cdp)"/>
+  <circle cx="11.4" cy="9.3" r="1" fill="url(#cdp)"/>
+  <path d="M13.4 15.8L13.4 26.4L17 23.2L19.2 27.8L21.4 26.8L19.2 22.4L24 22.1Z" fill="url(#cdp)"/>
+</svg>
