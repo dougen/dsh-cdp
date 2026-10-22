@@ -2,7 +2,7 @@
 // through `__test`.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { join } from 'node:path'
+import { join, parse, resolve, sep } from 'node:path'
 import { BrowserSession, __test } from '../lib/index.js'
 import { CdpError } from '../lib/cdp.js'
 
@@ -78,7 +78,9 @@ test('clipText truncates by bytes without splitting a surrogate pair', () => {
 })
 
 test('resolveShotDir keeps shots under the configured directory', () => {
-  const base = 'D:\\tmp\\dsh-cdp-shots'
+  // Built with the platform's own separators so the expectations hold on
+  // Windows and POSIX alike.
+  const base = resolve('dsh-cdp-shot-root', 'shots')
   const s = session({ shotDir: base })
   // Omitted / empty / "." all mean the base itself.
   assert.equal(resolveShotDir(s, undefined), base)
@@ -86,16 +88,17 @@ test('resolveShotDir keeps shots under the configured directory', () => {
   assert.equal(resolveShotDir(s, '.'), base)
   // A relative subdirectory is fine, in either separator style.
   assert.equal(resolveShotDir(s, 'sub'), join(base, 'sub'))
-  assert.equal(resolveShotDir(s, 'a\\b'), join(base, 'a', 'b'))
   assert.equal(resolveShotDir(s, 'a/b'), join(base, 'a', 'b'))
+  if (sep === '\\') assert.equal(resolveShotDir(s, 'a\\b'), join(base, 'a', 'b'))
 })
 
 test('resolveShotDir refuses anything that escapes the screenshot dir', () => {
-  const base = 'D:\\tmp\\dsh-cdp-shots'
+  const base = resolve('dsh-cdp-shot-root', 'shots')
   const s = session({ shotDir: base })
+  // An absolute path outside the base is refused on every platform.
+  const outside = join(parse(base).root, 'definitely-outside')
   assert.throws(() => resolveShotDir(s, '..'), /escapes/)
-  assert.throws(() => resolveShotDir(s, 'sub\\..\\..\\x'), /escapes/)
-  assert.throws(() => resolveShotDir(s, 'C:\\Windows\\System32'), /escapes/)
-  assert.throws(() => resolveShotDir(s, '/etc'), /escapes/)
+  assert.throws(() => resolveShotDir(s, join('sub', '..', '..', 'x')), /escapes/)
+  assert.throws(() => resolveShotDir(s, outside), /escapes/)
   assert.throws(() => resolveShotDir(s, 42), /relative to the screenshot dir/)
 })
