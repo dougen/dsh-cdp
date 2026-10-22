@@ -37,32 +37,45 @@ retry in a loop.
 | `snapshot` | `tabId?`, `limit?` | trimmed DOM tree (node cap applies) |
 | `click` | `selector` or `x`+`y`, `tabId?` | what was clicked |
 | `type` | `text`, `selector?`, `tabId?` | characters typed |
-| `shot` | `tabId?`, `fullPage?`, `out?` (directory) | **path** to a PNG on disk |
+| `shot` | `tabId?`, `fullPage?`, `out?` (directory) | **path** to a PNG on disk; `truncated` is true if the page was taller than the full-page cap |
 | `assert` | `checks[]`, `tabId?` | pass/fail report |
 | `reconnect` / `stop` | — | connection control |
 
 `open`/`goto` also take `settleMs`, `eval` takes `awaitPromise`; `console` and
 `network` are accepted but capture nothing.
 
-## Tabs you did not open are read-only
+## Writing requires a tab you opened
 
-The browser holds the user's own session, so the tabs already open may be in
-active use. This is a rule you keep, not one the plugin enforces: always pass an
-explicit `tabId`, because omitting it falls back to the first page the browser
-reports — normally one of the user's.
+The browser holds the user's own session, so pages already open may be in
+active use. This is enforced, not advisory: `goto`, `click`, `type`, `close`,
+and any `assert` whose checks carry `click` must pass the `tabId` of a tab you
+opened with `open`. Omitting `tabId` on those commands is an error, not a
+fallback to the first page.
 
-- **Reading is fine:** `tabs`, `snapshot`, `shot`, and an `eval` that only
-  inspects. This is how you find out what is on the page.
-- **Changing a page needs a tab you opened:** `goto`, `click`, `type`, any
-  `assert` check carrying `click`, and `close` must target an id returned by
-  your own `open`. Navigating, typing in, or closing a tab the user is looking
-  at moves the page out from under them.
+- **Reading is fine anywhere:** `tabs`, `snapshot`, `shot`, and an `eval` that
+  only inspects. This is how you find out what is on a page.
 - **To act on a page that is already open, `open` your own tab and `goto` the
   same URL** — the copy is authenticated too, since the login state is the
   browser's. Read the `url` from `tabs` rather than driving the original.
 - **Close what you opened, in the turn that opened it.** Keep the id for every
   follow-up call on that page and `close` it once the work is done; a tab left
   behind is a visible change to the user's browser.
+- After a reconnect your earlier tabs are no longer owned — `open` a fresh one.
+- `eval` has no read/write distinction, so the guard does not apply to it.
+  Keep `eval` side-effect free on tabs you did not open.
+
+## Logins, CAPTCHAs, and other human-only steps
+
+There is no bypass and you must not improvise one. When a page you are driving
+hits a login wall, a CAPTCHA, a 2FA prompt, or anything only a human can
+complete:
+
+1. **Stop.** Do not retry, do not fill in credentials yourself, do not click
+   around the prompt.
+2. **Tell the user exactly what is needed and where** — which tab (give the
+   URL), and what the page is asking for. Then wait for their confirmation.
+3. **Resume from where you stopped**, re-reading the page state first: the
+   user may have logged in, navigated elsewhere, or closed the tab.
 
 ## Keeping token use low
 
@@ -94,6 +107,14 @@ only means the command ran.
 
 ## Notes
 
+- Every browser command is appended to a local audit trail (JSONL, one line
+  per command: what, which tab, ok/failed, duration). If the user asks what
+  was done to their browser, the file lives under the OS temp dir in
+  `dsh-cdp-audit/` unless the host configured `auditDir`.
+- `shot` with `fullPage: true` captures the whole document without resizing
+  the page. Content that only loads when scrolled into view may be missing
+  from it — if completeness matters, scroll the page first (via `eval` with
+  `window.scrollTo`) and re-shoot, or take several viewport shots.
 - The plugin never launches a browser. If nothing is found, run `browsers` and
   give the user the printed launch command. A browser started with an explicit
   non-zero `--remote-debugging-port` is found on that port; otherwise discovery
