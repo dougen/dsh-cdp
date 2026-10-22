@@ -89,7 +89,7 @@ Because the connection is long-lived and heartbeated, Chromium's remote-debuggin
 Two implementation details:
 
 - **Discovery takes two paths.** By default it reads the `DevToolsActivePort` file under the browser's profile directory (written when the browser picks its own port); if the browser was started with an explicit non-zero `--remote-debugging-port`, it uses that port — in which case the browser **deliberately does not write** the file. The verdict is always "TCP reachable + WebSocket handshake succeeded".
-- **"Awaiting approval" is a state of its own, not "cannot connect".** While the browser waits for approval the socket neither opens nor errors — it stays silent. The plugin puts a deadline on the handshake and classifies that silence as this state. The parked socket is **kept and reused**: once you click Allow it is adopted directly, which does not open another connection (that would raise a second prompt).
+- **"Awaiting approval" is a state of its own, not "cannot connect".** While the browser waits for approval the socket neither opens nor errors — it stays silent. The plugin puts a deadline on the handshake and classifies that silence as this state. The parked socket is **kept and reused**: once you click Allow it is adopted directly, which does not open another connection (that would raise a second prompt). The state is not a dead end either: a socket that dies, or stays silent well past any plausible prompt (90s), is dropped and the plugin reconnects on its own.
 
 The `browser-cdp` skill keeps the agent off your tabs by mechanism, not by convention: read commands may inspect any page, but `goto`, `click`, `type`, `close`, and click-carrying assertions are only accepted on a tab the plugin opened itself, and every browser command is appended to a local audit trail.
 
@@ -190,7 +190,7 @@ DSH 宿主进程
 两个实现细节：
 
 - **浏览器发现走两路。** 默认读浏览器配置目录下的 `DevToolsActivePort` 文件（浏览器自选端口时写它）；若浏览器是用显式非零 `--remote-debugging-port` 启动的，则用该端口——此时浏览器**故意不写**那个文件。判定始终以「TCP 可连 + WebSocket 握手成功」为准。
-- **「等待授权」是独立状态，不是「连不上」。** 浏览器等待授权时，socket 既不 `open` 也不 `error`，只是沉默。插件给握手设了期限，把这段沉默归类成该状态。被挂起的 socket 会**保留并复用**：你点 Allow 后直接接管，不会另开连接（那会弹出第二个授权框）。
+- **「等待授权」是独立状态，不是「连不上」。** 浏览器等待授权时，socket 既不 `open` 也不 `error`，只是沉默。插件给握手设了期限，把这段沉默归类成该状态。被挂起的 socket 会**保留并复用**：你点 Allow 后直接接管，不会另开连接（那会弹出第二个授权框）。这个状态也不是死路：socket 若报错、或沉默到远超任何真实弹窗的时长（90 秒），插件会丢弃它并自动重连。
 
 `browser-cdp` skill 用机制而非约定来保证 agent 不碰你的标签页：读命令可以检查任何页面，但 `goto`、`click`、`type`、`close` 以及带点击的断言只接受插件自己新开的标签，且每条浏览器命令都会追加到本地审计日志。
 

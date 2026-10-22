@@ -4,9 +4,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { join, parse, resolve, sep } from 'node:path'
 import { BrowserSession, __test } from '../lib/index.js'
-import { CdpError } from '../lib/cdp.js'
+import { CdpError, FailureKind } from '../lib/cdp.js'
 
-const { checkWriteTab, clipText, isLocalHost, resolveShotDir } = __test
+const { approvalWatchStep, checkWriteTab, clipText, isLocalHost, resolveShotDir } = __test
 
 function session(config = {}) {
   return new BrowserSession({}, config)
@@ -101,4 +101,30 @@ test('resolveShotDir refuses anything that escapes the screenshot dir', () => {
   assert.throws(() => resolveShotDir(s, join('sub', '..', '..', 'x')), /escapes/)
   assert.throws(() => resolveShotDir(s, outside), /escapes/)
   assert.throws(() => resolveShotDir(s, 42), /relative to the screenshot dir/)
+})
+
+const GIVE_UP = 90_000
+
+test('approvalWatchStep promotes a socket that finally opened', () => {
+  assert.equal(approvalWatchStep(null, 0, GIVE_UP), 'promote')
+  assert.equal(approvalWatchStep(null, GIVE_UP * 10, GIVE_UP), 'promote')
+})
+
+test('approvalWatchStep keeps waiting on silence inside the budget', () => {
+  assert.equal(approvalWatchStep(FailureKind.AwaitingApproval, 0, GIVE_UP), 'wait')
+  assert.equal(approvalWatchStep(FailureKind.AwaitingApproval, GIVE_UP - 1, GIVE_UP), 'wait')
+})
+
+test('approvalWatchStep recovers once the budget is exhausted', () => {
+  // Even though the socket is still silent, a real prompt does not wait this
+  // long — staying parked forever is the bug this replaces.
+  assert.equal(approvalWatchStep(FailureKind.AwaitingApproval, GIVE_UP, GIVE_UP), 'recover')
+  assert.equal(approvalWatchStep(FailureKind.AwaitingApproval, GIVE_UP * 2, GIVE_UP), 'recover')
+})
+
+test('approvalWatchStep recovers immediately when the socket died', () => {
+  // A dead socket can never open: waiting on it is the stuck-state path.
+  assert.equal(approvalWatchStep(FailureKind.Unreachable, 0, GIVE_UP), 'recover')
+  assert.equal(approvalWatchStep(FailureKind.Protocol, 0, GIVE_UP), 'recover')
+  assert.equal(approvalWatchStep(FailureKind.Aborted, 0, GIVE_UP), 'recover')
 })
