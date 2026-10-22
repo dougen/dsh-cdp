@@ -3,7 +3,8 @@
 // without a browser.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CdpConnection, CdpError, FailureKind, screenshot } from '../lib/cdp.js'
+import { deflateSync } from 'node:zlib'
+import { CdpConnection, CdpError, FailureKind, runChecks, screenshot } from '../lib/cdp.js'
 
 class FakeSocket {
   constructor() {
@@ -77,6 +78,48 @@ function connect({ callTimeoutMs = 200 } = {}) {
     socketFactory: () => socket,
   })
   return { socket, connection }
+}
+
+// A 1×1 solid-colour PNG the runChecks test can decode without a browser.
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+let crcTable = null
+function crc32(buf) {
+  if (crcTable === null) {
+    crcTable = new Uint32Array(256)
+    for (let n = 0; n < 256; n += 1) {
+      let c = n
+      for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+      crcTable[n] = c >>> 0
+    }
+  }
+  let crc = 0xffffffff
+  for (const byte of buf) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+function chunk(type, data) {
+  const out = Buffer.alloc(8 + data.length + 4)
+  out.writeUInt32BE(data.length, 0)
+  out.write(type, 4, 'ascii')
+  data.copy(out, 8)
+  out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length)
+  return out
+}
+
+function solidPng([r, g, b]) {
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(1, 0)
+  ihdr.writeUInt32BE(1, 4)
+  ihdr[8] = 8 // bit depth
+  ihdr[9] = 6 // RGBA
+  const scanline = Buffer.from([0, r, g, b, 255]) // filter 0, one pixel
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(scanline)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
 }
 
 /**
@@ -181,6 +224,33 @@ test('a closed connection fails pending sends', async () => {
   await assert.rejects(connection.send('Target.getTargets'), /not connected/)
 })
 
+test('socket loss reaches onClose, never the CDP event bus', async () => {
+  const { socket, connection } = await connected({ callTimeoutMs: 5000 })
+
+  let busHits = 0
+  let closeHits = 0
+  // The protocol has no "close" event: this listener must stay silent forever.
+  connection.on('close', () => {
+    busHits += 1
+  })
+  connection.onClose(() => {
+    closeHits += 1
+  })
+  const off = connection.onClose(() => {
+    closeHits += 1
+  })
+  off() // subscribed then unsubscribed: only the first must fire
+
+  socket.close()
+  assert.equal(closeHits, 1, 'the unsubscribed listener was not notified')
+  assert.equal(busHits, 0, 'the CDP event bus does not carry socket loss')
+  assert.equal(connection.connected, false)
+
+  // A socket dies once: a duplicate close event must not re-notify.
+  socket.fail()
+  assert.equal(closeHits, 1)
+})
+
 test('viewport screenshot sends no clip', async () => {
   const { socket, connection } = await connected()
   socket.responder = (message) =>
@@ -221,4 +291,30 @@ test('fullPage screenshot under the cap reports no truncation', async () => {
   const shot = socket.sent.find((m) => m.method === 'Page.captureScreenshot')
   assert.equal(shot.params.clip.height, 3000)
   assert.equal(truncated, false)
+})
+
+test('a pixel check after a click re-captures instead of using the pre-click shot', async () => {
+  const { socket, connection } = await connected({ callTimeoutMs: 5000 })
+  const shots = [solidPng([0, 0, 0]), solidPng([255, 255, 255])]
+  let shotIndex = 0
+  socket.responder = (message) => {
+    // The click-target probe takes the zero-box DOM-click path, so no Input
+    // events are needed.
+    if (message.method === 'Runtime.evaluate') return { result: { value: { dom: true } } }
+    if (message.method === 'Page.captureScreenshot') {
+      return { data: shots[shotIndex++].toString('base64') }
+    }
+    return undefined
+  }
+
+  const results = await runChecks(connection, 'S1', [
+    { name: 'before', type: 'pixel', x: 0, y: 0, color: '#000000' },
+    { name: 'toggle', click: '#switch', waitMs: 0 },
+    { name: 'after', type: 'pixel', x: 0, y: 0, color: '#ffffff' },
+  ])
+
+  const captures = socket.sent.filter((m) => m.method === 'Page.captureScreenshot')
+  assert.equal(captures.length, 2, 'the post-click pixel check took a fresh screenshot')
+  assert.equal(results[0].ok, true)
+  assert.equal(results[2].ok, true)
 })

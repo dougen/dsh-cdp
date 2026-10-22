@@ -2,10 +2,11 @@
 // through `__test`.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { join } from 'node:path'
 import { BrowserSession, __test } from '../lib/index.js'
 import { CdpError } from '../lib/cdp.js'
 
-const { checkWriteTab, clipText, isLocalHost } = __test
+const { checkWriteTab, clipText, isLocalHost, resolveShotDir } = __test
 
 function session(config = {}) {
   return new BrowserSession({}, config)
@@ -74,4 +75,27 @@ test('clipText truncates by bytes without splitting a surrogate pair', () => {
   const cjk = clipText('一二三四五', 4)
   assert.equal(cjk.startsWith('一'), true)
   assert.equal(cjk.includes('\uFFFD'), false)
+})
+
+test('resolveShotDir keeps shots under the configured directory', () => {
+  const base = 'D:\\tmp\\dsh-cdp-shots'
+  const s = session({ shotDir: base })
+  // Omitted / empty / "." all mean the base itself.
+  assert.equal(resolveShotDir(s, undefined), base)
+  assert.equal(resolveShotDir(s, ''), base)
+  assert.equal(resolveShotDir(s, '.'), base)
+  // A relative subdirectory is fine, in either separator style.
+  assert.equal(resolveShotDir(s, 'sub'), join(base, 'sub'))
+  assert.equal(resolveShotDir(s, 'a\\b'), join(base, 'a', 'b'))
+  assert.equal(resolveShotDir(s, 'a/b'), join(base, 'a', 'b'))
+})
+
+test('resolveShotDir refuses anything that escapes the screenshot dir', () => {
+  const base = 'D:\\tmp\\dsh-cdp-shots'
+  const s = session({ shotDir: base })
+  assert.throws(() => resolveShotDir(s, '..'), /escapes/)
+  assert.throws(() => resolveShotDir(s, 'sub\\..\\..\\x'), /escapes/)
+  assert.throws(() => resolveShotDir(s, 'C:\\Windows\\System32'), /escapes/)
+  assert.throws(() => resolveShotDir(s, '/etc'), /escapes/)
+  assert.throws(() => resolveShotDir(s, 42), /relative to the screenshot dir/)
 })

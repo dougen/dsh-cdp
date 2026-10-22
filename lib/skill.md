@@ -37,7 +37,7 @@ retry in a loop.
 | `snapshot` | `tabId?`, `limit?` | trimmed DOM tree (node cap applies) |
 | `click` | `selector` or `x`+`y`, `tabId?` | what was clicked |
 | `type` | `text`, `selector?`, `tabId?` | characters typed |
-| `shot` | `tabId?`, `fullPage?`, `out?` (directory) | **path** to a PNG on disk; `truncated` is true if the page was taller than the full-page cap |
+| `shot` | `tabId?`, `fullPage?`, `out?` (relative directory under the host's screenshot dir) | **path** to a PNG on disk; `truncated` is true if the page was taller than the full-page cap |
 | `assert` | `checks[]`, `tabId?` | pass/fail report |
 | `reconnect` / `stop` | — | connection control |
 
