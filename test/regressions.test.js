@@ -2,6 +2,7 @@
 // command reported success while doing something other than what it said.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { join, parse } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import {
   CdpConnection,
@@ -386,14 +387,17 @@ test('wait cannot be asked for more than the connection can service', async () =
 
 // --- upload paths are confined ---------------------------------------------
 
+// Absolute paths for the platform running the test: a Windows-shaped
+// `C:\allowed` is a relative path on POSIX, so it would be refused for the
+// wrong reason there.
+const root = join(parse(process.cwd()).root, 'dsh-cdp-upload-root')
+const outsideFile = join(parse(root).root, 'someone', 'secret.txt')
+
 test('upload refuses a path outside the configured roots', async () => {
   const { __test } = await import('../lib/index.js')
   const { resolveUploadPath } = __test
-  const session = { config: { uploadRoots: ['C:\\allowed'] } }
-  assert.throws(
-    () => resolveUploadPath(session, 'C:\\Users\\someone\\secret.txt'),
-    /outside every allowed upload root/,
-  )
+  const session = { config: { uploadRoots: [root] } }
+  assert.throws(() => resolveUploadPath(session, outsideFile), /outside every allowed upload root/)
   assert.throws(() => resolveUploadPath(session, 'relative/path.txt'), /must be absolute/)
   assert.throws(() => resolveUploadPath(session, '\\\\server\\share\\file.txt'), /UNC or device path/)
 })
@@ -401,15 +405,16 @@ test('upload refuses a path outside the configured roots', async () => {
 test('upload accepts a path inside a configured root', async () => {
   const { __test } = await import('../lib/index.js')
   const { resolveUploadPath } = __test
-  const session = { config: { uploadRoots: ['C:\\allowed'] } }
-  assert.equal(resolveUploadPath(session, 'C:\\allowed\\docs\\a.txt'), 'C:\\allowed\\docs\\a.txt')
+  const session = { config: { uploadRoots: [root] } }
+  const inner = join(root, 'docs', 'a.txt')
+  assert.equal(resolveUploadPath(session, inner), inner)
 })
 
 test('upload is disabled when no root is configured', async () => {
   const { __test } = await import('../lib/index.js')
   const { resolveUploadPath } = __test
   const session = { config: { uploadRoots: [] } }
-  assert.throws(() => resolveUploadPath(session, 'C:\\anywhere\\a.txt'), /upload is disabled/)
+  assert.throws(() => resolveUploadPath(session, outsideFile), /upload is disabled/)
 })
 
 // --- dialogs: a pending one blocks the page until it is answered -----------
