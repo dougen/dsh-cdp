@@ -2,6 +2,9 @@
 // through `__test`.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, parse, resolve, sep } from 'node:path'
 import { BrowserSession, __test } from '../lib/index.js'
 import { CdpError, FailureKind } from '../lib/cdp.js'
@@ -127,4 +130,116 @@ test('approvalWatchStep recovers immediately when the socket died', () => {
   assert.equal(approvalWatchStep(FailureKind.Unreachable, 0, GIVE_UP), 'recover')
   assert.equal(approvalWatchStep(FailureKind.Protocol, 0, GIVE_UP), 'recover')
   assert.equal(approvalWatchStep(FailureKind.Aborted, 0, GIVE_UP), 'recover')
+})
+
+// --- a dropped socket stays down until a command asks for it ---------------
+//
+// Chromium asks for remote-debugging approval on every new connection. A browser
+// restart kills the socket; re-establishing it on the plugin's own initiative
+// therefore raises the prompt the moment the user opens their browser again, for
+// a session that never asked to drive it. Attaching is demand-driven instead.
+
+/** Poll until `predicate` holds. */
+async function until(predicate, timeoutMs = 5000) {
+  const started = Date.now()
+  while (!predicate()) {
+    if (Date.now() - started > timeoutMs) throw new Error('timed out waiting for the condition')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+/** The socket half of the global `WebSocket`, recording every instance made. */
+class FakeWebSocket {
+  constructor(sockets) {
+    this.readyState = 0
+    this.listeners = new Map()
+    this.sent = []
+    this.sockets = sockets
+    sockets.push(this)
+  }
+
+  addEventListener(type, fn) {
+    const list = this.listeners.get(type) ?? []
+    list.push(fn)
+    this.listeners.set(type, list)
+  }
+
+  #emit(type, event = {}) {
+    for (const fn of [...(this.listeners.get(type) ?? [])]) fn(event)
+  }
+
+  send(data) {
+    const message = JSON.parse(data)
+    this.sent.push(message)
+    queueMicrotask(() => {
+      this.#emit('message', { data: JSON.stringify({ id: message.id, result: { targetInfos: [] } }) })
+    })
+  }
+
+  open() {
+    this.readyState = 1
+    this.#emit('open')
+  }
+
+  close() {
+    this.readyState = 3
+    this.#emit('close')
+  }
+}
+
+test('a dropped connection is not re-established until a command asks for it', async () => {
+  const sockets = []
+  class StubWebSocket extends FakeWebSocket {
+    constructor() {
+      super(sockets)
+    }
+  }
+
+  // The browser's side of discovery: a listening port plus the port file that
+  // points at it. The HTTP route answers 404, as approval mode does.
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-cdp-drop-'))
+  const server = createServer((req, res) => {
+    res.statusCode = 404
+    res.end('not found')
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address()
+  await writeFile(join(dir, 'DevToolsActivePort'), `${port}\n/devtools/browser/fake\n`)
+
+  const previousWebSocket = globalThis.WebSocket
+  globalThis.WebSocket = StubWebSocket
+  // `ports: []` keeps the test off whatever real debug port exists on the host.
+  const s = new BrowserSession({}, { dataDir: dir, ports: [], autoConnect: false })
+
+  try {
+    const connecting = s.connect()
+    await until(() => sockets.length === 1)
+    sockets[0].open()
+    await connecting
+    assert.equal(s.state, 'connected')
+
+    // The browser quits: its socket closes.
+    sockets[0].close()
+    assert.equal(s.state, 'disconnected')
+    assert.equal(s.snapshot().endpoint, null)
+
+    // Longer than the first backoff step. Re-attaching here is exactly the
+    // regression: it would ask the user to approve a browser they just opened.
+    await new Promise((resolve) => setTimeout(resolve, 3500))
+    assert.equal(sockets.length, 1, 'nothing attached in the background')
+    assert.equal(s.state, 'disconnected')
+
+    // A command is the demand, so this attempt is allowed to attach again.
+    const attaching = s.connect()
+    await until(() => sockets.length === 2)
+    sockets[1].open()
+    await attaching
+    assert.equal(s.state, 'connected')
+  } finally {
+    await s.dispose().catch(() => {})
+    globalThis.WebSocket = previousWebSocket
+    server.closeAllConnections?.()
+    await new Promise((resolve) => server.close(resolve))
+    await rm(dir, { recursive: true, force: true })
+  }
 })

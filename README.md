@@ -60,10 +60,10 @@ Restart the Web GUI afterwards.
 
 | Symptom | Cause and handling |
 |---|---|
-| Grey icon / the panel says "Not connected" | The browser has no debug endpoint open. The panel prints the launch command for the browsers it found on this machine, ready to copy. |
+| Grey icon / the panel says "Not connected" | Not attached to a browser. The panel's button — or any browser command — connects, and the browser asks for approval once. If the panel also prints a launch command, no debug endpoint was found: enable remote debugging in `chrome://inspect` or use that command. |
 | The panel says "Awaiting approval" | Switch to the browser window and click **Allow**. If no prompt is visible, check that the browser is not minimised or covered by another window. |
 | A command returns `awaiting-approval` | Same as above. Have the user approve, then retry once — never in a loop. |
-| The icon greys out after a browser restart | Expected; the plugin reconnects on its own, and the browser may ask for approval again. |
+| The icon turns grey after a browser restart | Expected; the plugin does not attach by itself. The next browser command (or **Connect browser** in the panel) opens a new connection, and the browser asks for approval once. |
 | The icon turns blue | The agent is driving your browser right now. It stays blue for about five seconds after the command finishes, then returns to the connection colour. |
 | `--remote-debugging-port` will not attach to the default profile | An official Chrome/Edge 136+ restriction (it keeps malicious programs from reading cookies over the debug port). Use Option A. |
 | `browsers` lists only some browsers | It lists what is genuinely installed and has a profile directory; pin one in `cordis.patch.yml`. |
@@ -84,12 +84,12 @@ DSH host process
 
 The host process holds **exactly one** CDP connection and mounts browser operations on a loopback route. The agent calls it with the shell tools it already has (`Invoke-RestMethod`, `curl`), so the number of new model-visible tool schemas is **0**; usage is described by the `browser-cdp` skill the plugin registers, loaded only when it is needed.
 
-Because the connection is long-lived and heartbeated, Chromium's remote-debugging approval happens once, when the connection is established.
+Because the connection is long-lived and heartbeated, Chromium's remote-debugging approval happens once per browser session — when the connection is established. Attaching is demand-driven: the plugin never connects on its own, so merely launching the browser raises no prompt. The next browser command (or the panel's **Connect browser** button) is what opens the connection and asks for approval.
 
 Two implementation details:
 
 - **Discovery takes two paths.** By default it reads the `DevToolsActivePort` file under the browser's profile directory (written when the browser picks its own port); if the browser was started with an explicit non-zero `--remote-debugging-port`, it uses that port — in which case the browser **deliberately does not write** the file. The verdict is always "TCP reachable + WebSocket handshake succeeded".
-- **"Awaiting approval" is a state of its own, not "cannot connect".** While the browser waits for approval the socket neither opens nor errors — it stays silent. The plugin puts a deadline on the handshake and classifies that silence as this state. The parked socket is **kept and reused**: once you click Allow it is adopted directly, which does not open another connection (that would raise a second prompt). The state is not a dead end either: a socket that dies, or stays silent well past any plausible prompt (90s), is dropped and the plugin reconnects on its own.
+- **"Awaiting approval" is a state of its own, not "cannot connect".** While the browser waits for approval the socket neither opens nor errors — it stays silent. The plugin puts a deadline on the handshake and classifies that silence as this state. The parked socket is **kept and reused**: once you click Allow it is adopted directly, which does not open another connection (that would raise a second prompt). The state is not a dead end either: a socket that dies, or stays silent well past any plausible prompt (90s), is dropped — and nothing re-attaches until a command (or the panel's Connect button) asks for one. Chromium asks for approval per connection, so re-attaching on the plugin's own initiative would raise the prompt on every browser launch.
 
 The `browser-cdp` skill keeps the agent off your tabs by mechanism, not by convention: read commands may inspect any page, while every command that changes what the page shows — navigation, clicks, typing, hovering, scrolling, uploads, viewport/media overrides, closing, and dialog answers — is accepted only on a tab the plugin opened itself. Every command that reaches the browser is also appended to a local audit trail.
 
@@ -161,10 +161,10 @@ dsh plugin --profile web remove @dougen/dsh-cdp
 
 | 现象 | 原因与处理 |
 |---|---|
-| 图标是灰色 / 面板显示「未连接」 | 浏览器没有开启远程调试。面板会给出你机器上对应浏览器的启动命令，可一键复制。 |
+| 图标是灰色 / 面板显示「未连接」 | 尚未连接浏览器。点面板按钮或执行任意浏览器命令即可连接，浏览器会询问一次授权。若面板同时给出了启动命令，说明没有检测到调试端点：在浏览器中打开 `chrome://inspect` 允许远程调试，或用该命令启动。 |
 | 面板显示「等待授权」 | 切到浏览器窗口点 **Allow**。若没看到弹窗，检查浏览器是否被最小化或被其他窗口遮挡。 |
 | 命令返回 `awaiting-approval` | 同上。让用户点授权后再重试一次，不要循环重试。 |
-| 浏览器重启后图标变灰 | 正常，插件会自动重连；必要时浏览器会再次询问授权。 |
+| 浏览器重启后图标变灰 | 正常，插件不会自行连接。下一次浏览器命令（或面板里的「连接浏览器」）会建立新连接，浏览器会再询问一次授权。 |
 | 图标变成蓝色 | agent 正在操作你的浏览器。命令结束后还会保持约 5 秒，然后回到连接状态的颜色。 |
 | 无法用 `--remote-debugging-port` 连默认配置目录 | Chrome/Edge 136+ 的官方安全限制（防止恶意程序借调试端口读取 cookie），用上面方式 A。 |
 | `browsers` 只列出部分浏览器 | 只会列出真实安装了且有配置目录的；可用 `cordis.patch.yml` 固定某个浏览器。 |
@@ -185,12 +185,12 @@ DSH 宿主进程
 
 宿主进程内保持**唯一一条** CDP 连接，把浏览器操作挂在本机回环路由上。agent 用它已经有的 shell 工具（`Invoke-RestMethod`、`curl`）调用，所以新增的模型可见工具 schema 是 **0 个**；用法由随插件注册的 `browser-cdp` skill 说明，只在需要时加载。
 
-因为连接是常驻的、并且带心跳保活，Chromium 的远程调试授权只在建立连接时发生一次。
+因为连接是常驻的、并且带心跳保活，Chromium 的远程调试授权在每个浏览器会话里只发生一次——即建立连接的那一次。连接是按需建立的：插件从不主动连接，所以只是打开浏览器不会弹窗；下一次浏览器命令（或面板里的「连接浏览器」按钮）才会建立连接并请求授权。
 
 两个实现细节：
 
 - **浏览器发现走两路。** 默认读浏览器配置目录下的 `DevToolsActivePort` 文件（浏览器自选端口时写它）；若浏览器是用显式非零 `--remote-debugging-port` 启动的，则用该端口——此时浏览器**故意不写**那个文件。判定始终以「TCP 可连 + WebSocket 握手成功」为准。
-- **「等待授权」是独立状态，不是「连不上」。** 浏览器等待授权时，socket 既不 `open` 也不 `error`，只是沉默。插件给握手设了期限，把这段沉默归类成该状态。被挂起的 socket 会**保留并复用**：你点 Allow 后直接接管，不会另开连接（那会弹出第二个授权框）。这个状态也不是死路：socket 若报错、或沉默到远超任何真实弹窗的时长（90 秒），插件会丢弃它并自动重连。
+- **「等待授权」是独立状态，不是「连不上」。** 浏览器等待授权时，socket 既不 `open` 也不 `error`，只是沉默。插件给握手设了期限，把这段沉默归类成该状态。被挂起的 socket 会**保留并复用**：你点 Allow 后直接接管，不会另开连接（那会弹出第二个授权框）。这个状态也不是死路：socket 若报错、或沉默到远超任何真实弹窗的时长（90 秒），插件会丢弃它——之后不会有任何自动重连，直到下一次浏览器命令（或面板的「连接浏览器」）主动建立连接。Chromium 的授权是按连接的，插件自作主张重连就会让弹窗在每次打开浏览器时冒出来。
 
 `browser-cdp` skill 用机制而非约定来保证 agent 不碰你的标签页：读命令可以检查任何页面，而所有会改变页面显示的命令——导航、点击、输入、悬停、滚动、上传、视口/媒体覆盖、关闭标签、应答弹窗——只接受插件自己新开的标签。每条真正触达浏览器的命令都会追加到本地审计日志。
 

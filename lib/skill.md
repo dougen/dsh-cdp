@@ -3,7 +3,9 @@
 Drive a Chromium-family browser already running on this machine. The plugin
 attaches to whichever one has remote debugging enabled; it never launches one,
 and it holds a single long-lived connection so the browser asks for approval
-once.
+once. It also never connects on its own: attaching happens only for a command
+that needs the browser (or when the user clicks Connect in the panel), so merely
+opening the browser raises no prompt.
 
 ## Calling convention
 
@@ -56,8 +58,11 @@ failed".
 
 Connecting is lazy: the first command that needs the browser attaches, so
 `status` reporting `idle` is normal and means no prompt has been raised yet.
-`status` and `browsers` read only local state and answer without joining the
-command queue; every other command is serialised, so a long `wait` holds the
+Nothing attaches on its own — not at plugin load, and not after the browser
+restarts — so a browser that was merely reopened carries no permission request.
+The next command opens the connection and the browser asks for approval once
+for it. `status` and `browsers` read only local state and answer without joining
+the command queue; every other command is serialised, so a long `wait` holds the
 next one.
 
 ## Which tabs you may touch
@@ -87,8 +92,9 @@ active use. The plugin enforces the boundary rather than trusting prose.
 - **Close what you opened, in the turn that opened it.** A tab left behind is a
   visible change to the user's browser. After `reconnect` or `stop` your
   earlier tabs are no longer owned, so `close` will refuse them — tell the user
-  which URL was left open. A socket drop that reconnects on its own keeps
-  ownership, but the old tab may be gone; re-check `tabs` before reusing its id.
+  which URL was left open. Ownership survives a dropped socket, because the
+  plugin does not re-attach by itself: the next command reconnects and keeps the
+  grant, but the old tab may be gone, so re-check `tabs` before reusing its id.
 - `eval` and `wait`'s `expression` have no read/write distinction, so the guard
   cannot apply to them. Keep them side-effect free on tabs you did not open.
 
