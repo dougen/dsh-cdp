@@ -60,7 +60,7 @@ Restart the Web GUI afterwards.
 
 | Symptom | Cause and handling |
 |---|---|
-| Grey icon / the panel says "Not connected" | Not attached to a browser. The panel's button — or any browser command — connects, and the browser asks for approval once. If the panel also prints a launch command, no debug endpoint was found: enable remote debugging in `chrome://inspect` or use that command. |
+| Grey icon / the panel says "Not connected" | Not attached to a browser. The panel's button — or any browser command — connects, and the browser asks for approval once. If no debug endpoint is found, enable remote debugging in `chrome://inspect`. |
 | The panel says "Awaiting approval" | Switch to the browser window and click **Allow**. If no prompt is visible, check that the browser is not minimised or covered by another window. |
 | A command returns `awaiting-approval` | Same as above. Have the user approve, then retry once — never in a loop. |
 | The icon turns grey after a browser restart | Expected; the plugin does not attach by itself. The next browser command (or **Connect browser** in the panel) opens a new connection, and the browser asks for approval once. |
@@ -161,7 +161,7 @@ dsh plugin --profile web remove @dougen/dsh-cdp
 
 | 现象 | 原因与处理 |
 |---|---|
-| 图标是灰色 / 面板显示「未连接」 | 尚未连接浏览器。点面板按钮或执行任意浏览器命令即可连接，浏览器会询问一次授权。若面板同时给出了启动命令，说明没有检测到调试端点：在浏览器中打开 `chrome://inspect` 允许远程调试，或用该命令启动。 |
+| 图标是灰色 / 面板显示「未连接」 | 尚未连接浏览器。点面板按钮或执行任意浏览器命令即可连接，浏览器会询问一次授权。若没有检测到调试端点，在浏览器中打开 `chrome://inspect` 允许远程调试。 |
 | 面板显示「等待授权」 | 切到浏览器窗口点 **Allow**。若没看到弹窗，检查浏览器是否被最小化或被其他窗口遮挡。 |
 | 命令返回 `awaiting-approval` | 同上。让用户点授权后再重试一次，不要循环重试。 |
 | 浏览器重启后图标变灰 | 正常，插件不会自行连接。下一次浏览器命令（或面板里的「连接浏览器」）会建立新连接，浏览器会再询问一次授权。 |
