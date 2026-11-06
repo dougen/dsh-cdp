@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Browser control",
+    "description": "Drive an already-running Chromium browser from DSH over CDP — Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Arc, Thorium: one approval per connection, no new tools, no runtime dependencies.",
+    "detail": "README.md"
+  }
+}

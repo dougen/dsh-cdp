@@ -1,6 +1,6 @@
 # @dougen/dsh-cdp
 
-**English** · [中文](#中文)
+**English** · [中文](README.zh.md)
 
 Drive the Chromium browser you are **already using** from DSH — your logins, cookies, and extensions stay exactly where they are.
 
@@ -68,7 +68,7 @@ Restart the Web GUI afterwards.
 | `--remote-debugging-port` will not attach to the default profile | An official Chrome/Edge 136+ restriction (it keeps malicious programs from reading cookies over the debug port). Use Option A. |
 | `browsers` lists only some browsers | It lists what is genuinely installed and has a profile directory; pin one in `cordis.patch.yml`. |
 
-The panel and every hint follow the Web GUI's language setting: Chinese and English switch automatically with the profile.
+The plugin title, description, panel, and this README follow the Web GUI's language setting: Chinese renders in Chinese; every other language renders in English.
 
 ## 3. How it works
 
@@ -92,107 +92,6 @@ Two implementation details:
 - **"Awaiting approval" is a state of its own, not "cannot connect".** While the browser waits for approval the socket neither opens nor errors — it stays silent. The plugin puts a deadline on the handshake and classifies that silence as this state. The parked socket is **kept and reused**: once you click Allow it is adopted directly, which does not open another connection (that would raise a second prompt). The state is not a dead end either: a socket that dies, or stays silent well past any plausible prompt (90s), is dropped — and nothing re-attaches until a command (or the panel's Connect button) asks for one. Chromium asks for approval per connection, so re-attaching on the plugin's own initiative would raise the prompt on every browser launch.
 
 The `browser-cdp` skill keeps the agent off your tabs by mechanism, not by convention: read commands may inspect any page, while every command that changes what the page shows — navigation, clicks, typing, hovering, scrolling, uploads, viewport/media overrides, closing, and dialog answers — is accepted only on a tab the plugin opened itself. Every command that reaches the browser is also appended to a local audit trail.
-
-## License
-
-MIT
-
----
-
-## 中文
-
-[English ↑](#dougen-dsh-cdp)
-
-让 DSH 直接驱动你**已经在用的** Chromium 内核浏览器——保留你的登录态、cookie 和扩展。
-
-支持 Chrome、Edge、Brave、Vivaldi、Opera、Chromium、Arc、Thorium。
-
-**兼容 DSH 0.1.0 及以上版本**——`0.1.x` 与 `0.2.x` 全系列，含预发布版。
-
-## 一、它做什么
-
-DSH 可以读取并操作你浏览器里真实打开的页面：导航、执行 JS、读取 DOM 或无障碍树、点击、悬停、拖拽、输入、按键、截图、模拟视口与深色模式、读取控制台与网络日志，以及做 DOM / 像素断言。所以「看看这个页面上有什么」「登录后把数据抓下来」「这个页面渲染对不对」这类事情，用的是你真实的登录态，不需要另开一个干净的浏览器。
-
-它针对用 CDP 操作浏览器的三个常见麻烦：
-
-| 常见做法 | 问题 | 本插件 |
-|---|---|---|
-| 每次操作新建 CDP 连接 | Chromium 的远程调试授权是**按连接**的 → 每次都要弹窗 | 常驻一条连接 + 心跳保活，**授权一次** |
-| 把浏览器能力注册成多个工具 / MCP | 每个工具的 schema 都进每一次请求，token 开销固定 | **零新增工具**，agent 用已有的 shell 工具调用 |
-| 浏览器扩展 + 常驻监控程序 | 多一层扩展依赖，安装复杂 | **零运行时依赖**，纯插件 |
-
-## 二、安装与卸载
-
-### 安装
-
-```sh
-dsh plugin --profile web add @dougen/dsh-cdp
-```
-
-装完重启 Web GUI（`dsh web`）后生效。
-
-插件自带 `browser-cdp` skill，**无需另外安装 skill 文件**。
-
-### 让浏览器可以被连接
-
-插件**从不启动、也从不关闭**你的浏览器——它只连接你自己启动的实例。这一步在 DSH 之外完成，所以 agent 永远不会因此请求授权。
-
-**方式 A：用浏览器自带的远程调试开关（推荐，保留登录态）**
-
-在浏览器地址栏打开 `chrome://inspect`（Edge 是 `edge://inspect`），勾选允许远程调试。之后照常启动浏览器即可。
-
-**方式 B：用独立配置目录启动（不弹窗，但没有现有登录态）**
-
-```sh
-msedge.exe --remote-debugging-port=9222 --user-data-dir="C:\edge-debug"
-```
-
-这是一个全新的配置目录，没有你现有的 cookie、登录态和扩展。适合测试。
-
-### 卸载
-
-```sh
-dsh plugin --profile web remove @dougen/dsh-cdp
-```
-
-重启 Web GUI 后生效。
-
-### 可能遇到的情况
-
-| 现象 | 原因与处理 |
-|---|---|
-| 图标是灰色 / 面板显示「未连接」 | 尚未连接浏览器。点面板按钮或执行任意浏览器命令即可连接，浏览器会询问一次授权。若没有检测到调试端点，在浏览器中打开 `chrome://inspect` 允许远程调试。 |
-| 面板显示「等待授权」 | 切到浏览器窗口点 **Allow**。若没看到弹窗，检查浏览器是否被最小化或被其他窗口遮挡。 |
-| 命令返回 `awaiting-approval` | 同上。让用户点授权后再重试一次，不要循环重试。 |
-| 浏览器重启后图标变灰 | 正常，插件不会自行连接。下一次浏览器命令（或面板里的「连接浏览器」）会建立新连接，浏览器会再询问一次授权。 |
-| 图标变成蓝色 | agent 正在操作你的浏览器。命令结束后还会保持约 5 秒，然后回到连接状态的颜色。 |
-| 无法用 `--remote-debugging-port` 连默认配置目录 | Chrome/Edge 136+ 的官方安全限制（防止恶意程序借调试端口读取 cookie），用上面方式 A。 |
-| `browsers` 只列出部分浏览器 | 只会列出真实安装了且有配置目录的；可用 `cordis.patch.yml` 固定某个浏览器。 |
-
-面板和所有界面提示跟随 Web GUI 的语言设置，中文与英文随配置文件自动切换。
-
-## 三、工作原理
-
-```
-DSH 宿主进程
-├── 唯一一条 CDP WebSocket（心跳保活）
-├── /api/dsh-cdp          本机 HTTP 路由，仅接受回环 Host
-└── 自带 browser-cdp skill
-        ↑ agent 用已有 shell 工具调用（无新增工具）
-        ↓
-   你的浏览器（Chrome / Edge / Brave / …）
-```
-
-宿主进程内保持**唯一一条** CDP 连接，把浏览器操作挂在本机回环路由上。agent 用它已经有的 shell 工具（`Invoke-RestMethod`、`curl`）调用，所以新增的模型可见工具 schema 是 **0 个**；用法由随插件注册的 `browser-cdp` skill 说明，只在需要时加载。
-
-因为连接是常驻的、并且带心跳保活，Chromium 的远程调试授权在每个浏览器会话里只发生一次——即建立连接的那一次。连接是按需建立的：插件从不主动连接，所以只是打开浏览器不会弹窗；下一次浏览器命令（或面板里的「连接浏览器」按钮）才会建立连接并请求授权。
-
-两个实现细节：
-
-- **浏览器发现走两路。** 默认读浏览器配置目录下的 `DevToolsActivePort` 文件（浏览器自选端口时写它）；若浏览器是用显式非零 `--remote-debugging-port` 启动的，则用该端口——此时浏览器**故意不写**那个文件。判定始终以「TCP 可连 + WebSocket 握手成功」为准。
-- **「等待授权」是独立状态，不是「连不上」。** 浏览器等待授权时，socket 既不 `open` 也不 `error`，只是沉默。插件给握手设了期限，把这段沉默归类成该状态。被挂起的 socket 会**保留并复用**：你点 Allow 后直接接管，不会另开连接（那会弹出第二个授权框）。这个状态也不是死路：socket 若报错、或沉默到远超任何真实弹窗的时长（90 秒），插件会丢弃它——之后不会有任何自动重连，直到下一次浏览器命令（或面板的「连接浏览器」）主动建立连接。Chromium 的授权是按连接的，插件自作主张重连就会让弹窗在每次打开浏览器时冒出来。
-
-`browser-cdp` skill 用机制而非约定来保证 agent 不碰你的标签页：读命令可以检查任何页面，而所有会改变页面显示的命令——导航、点击、输入、悬停、滚动、上传、视口/媒体覆盖、关闭标签、应答弹窗——只接受插件自己新开的标签。每条真正触达浏览器的命令都会追加到本地审计日志。
 
 ## License
 

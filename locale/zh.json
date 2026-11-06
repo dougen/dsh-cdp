@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "控制浏览器",
+    "description": "从 DSH 通过 CDP 驱动本机已启动的 Chromium 内核浏览器——Chrome、Edge、Brave、Vivaldi、Opera、Chromium、Arc、Thorium：每次连接只授权一次，不新增工具，零运行时依赖。",
+    "detail": "README.zh.md"
+  }
+}
