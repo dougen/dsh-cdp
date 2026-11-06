@@ -1,6 +1,6 @@
 {
   "name": "@dougen/dsh-cdp",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Drive an already-running Chromium browser from DSH over CDP — Chrome, Edge, Brave, Vivaldi, Opera, Chromium, Arc, Thorium: one approval per connection, no new tools, no runtime dependencies.",
   "type": "module",
   "main": "lib/index.js",
